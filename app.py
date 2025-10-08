@@ -12,7 +12,7 @@ def load_model():
     try:
         hf_token = st.secrets.get("HF_TOKEN", None)
 
-        model_id = "prompthero/openjourney"
+        model_id = "dripza/mexicyber"
         pipe = StableDiffusionPipeline.from_pretrained(
             model_id,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,

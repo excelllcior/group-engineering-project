@@ -19,7 +19,7 @@ def load_story_generator():
     """Загрузка модели для генерации текста"""
     try:
         # Используем модель для генерации текста на русском языке
-        model_name = "ai-forever/rugpt3-large"
+        model_name = "sberbank-ai/rugpt3large_based_on_gpt2"
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModelForCausalLM.from_pretrained(model_name)
         

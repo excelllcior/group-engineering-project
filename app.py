@@ -1,64 +1,85 @@
-import os
-import torch
-from PIL import Image
 import streamlit as st
-from diffusers import StableDiffusionPipeline
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+import torch
 
-st.title("Генерация изображений")
-st.markdown("Введите запрос, чтобы сгенерировать изображение!")
+# Настройка страницы
+st.set_page_config(
+    page_title="Генератор историй",
+    page_icon="📖",
+    layout="centered"
+)
 
+# Заголовок приложения
+st.title("📖 Генератор историй")
+st.markdown("Введите запрос и получите уникальную историю!")
+
+# Инициализация модели (кэшируем, чтобы не загружать каждый раз)
 @st.cache_resource
-def load_model():
+def load_story_generator():
+    """Загрузка модели для генерации текста"""
     try:
-        hf_token = st.secrets.get("HF_TOKEN", None)
-
-        model_id = "dripza/mexicyber"
-        pipe = StableDiffusionPipeline.from_pretrained(
-            model_id,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            use_auth_token=hf_token
+        # Используем модель для генерации текста на русском языке
+        model_name = "ai-forever/rugpt3-large"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForCausalLM.from_pretrained(model_name)
+        
+        # Создаем пайплайн для генерации текста
+        generator = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            device=0 if torch.cuda.is_available() else -1  # Используем GPU если доступен
         )
-
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        pipe = pipe.to(device)
-
-        return pipe
+        return generator
     except Exception as e:
         st.error(f"Ошибка при загрузке модели: {e}")
         return None
 
+# Загрузка модели
+with st.spinner("Загружаем модель для генерации историй..."):
+    generator = load_story_generator()
 
-col1, col2 = st.columns([1, 1])
+# Интерфейс пользователя
+user_input = st.text_area(
+    "Введите запрос для истории:",
+    placeholder="Например: 'История о рыцаре, который нашёл магический меч в древнем лесу...'",
+    height=100
+)
 
-with col1:
-    st.subheader("Введите запрос")
-    prompt = st.text_area(
-        "Опишите изображение:",
-        placeholder="Красивый закат над горами...",
-        height=100
-    )
-    generate_btn = st.button("Сгенерировать", type="primary", use_container_width=True)
+max_length = st.slider("Максимальная длина текста", 100, 500, 250)
 
-with col2:
-    st.subheader("Сгенерированное изображение")
-    image_placeholder = st.empty()
-    image_placeholder.info("Сгенерированное изображение появится здесь...")
+# Кнопка генерации
+generate_button = st.button("🎭 Сгенерировать историю", type="primary")
 
-with st.spinner("Загружаем модель..."):
-    pipe = load_model()
-
-if generate_btn:
-    if not prompt:
-        st.warning("Введите запрос!")
-    elif pipe is None:
-        st.error("Ошибка при загрузке модели")
+# Обработка генерации
+if generate_button:
+    if not user_input.strip():
+        st.warning("Пожалуйста, введите запрос для генерации истории.")
+    elif generator is None:
+        st.error("Модель не загружена. Пожалуйста, проверьте подключение к интернету.")
     else:
-        try:
-            with st.spinner("Генерируем изображение..."):
-                generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(42)
-                image = pipe(prompt, num_inference_steps=20, generator=generator).images[0]
-
-                image_placeholder.image(image, caption=f"'{prompt}'", use_column_width=True)
-                st.success("Изображение успешно сгенерировано!")
-        except Exception as e:
-            st.error(f"Ошибка при генерации: {e}")
+        with st.spinner("Генерируем вашу историю... Это может занять несколько секунд."):
+            try:
+                # Генерация текста
+                generated_text = generator(
+                    user_input,
+                    max_length=max_length,
+                    temperature=1,
+                    do_sample=True,
+                    pad_token_id=generator.tokenizer.eos_token_id,
+                    num_return_sequences=1
+                )
+                
+                # Извлекаем сгенерированный текст
+                story = generated_text[0]['generated_text']
+                
+                # Отображаем результат
+                st.success("✅ История сгенерирована!")
+                st.subheader("Ваша история:")
+                st.write(story)
+                
+                # Кнопка для копирования текста
+                st.code(story, language="text")
+                
+            except Exception as e:
+                st.error(f"Произошла ошибка при генерации: {e}")

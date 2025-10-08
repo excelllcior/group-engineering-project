@@ -64,7 +64,7 @@ if generate_button:
                 generated_text = generator(
                     user_input,
                     max_length=max_length,
-                    temperature=1,
+                    temperature=0.3,
                     do_sample=True,
                     pad_token_id=generator.tokenizer.eos_token_id,
                     num_return_sequences=1
